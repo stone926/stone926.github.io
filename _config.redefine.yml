@@ -29,7 +29,7 @@ defaults:
   # Site logo
   logo: 
   # Site avatar
-  avatar: /images/redefine-avatar.svg
+  avatar: https://avatars.githubusercontent.com/u/49868841?v=4
 # IMAGE CONFIGURATION <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< end
 
 
@@ -316,7 +316,7 @@ articles:
   # Whether to enable copyright notice
   copyright:
     enable: true # Whether to enable
-    default: cc_by_nc_sa # Default license, can be cc_by_nc_sa, cc_by_nd, cc_by_nc, cc_by_sa, cc_by, all_rights_reserved, public_domain
+    default: public_domain # Default license, can be cc_by_nc_sa, cc_by_nd, cc_by_nc, cc_by_sa, cc_by, all_rights_reserved, public_domain
   # Whether to enable lazyload for images
   lazyload: true
   # Pangu.js (automatically add space between Chinese and English). See https://github.com/vinta/pangu.js
@@ -342,7 +342,7 @@ articles:
 # Docs: https://redefine-docs.ohevan.com/posts/comment
 comment:
   # Whether to enable comment
-  enable: true
+  enable: false
   # Comment system
   system: waline # waline, gitalk, twikoo, giscus
   # System configuration
