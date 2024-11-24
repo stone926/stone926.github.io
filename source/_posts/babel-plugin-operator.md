@@ -3,8 +3,6 @@ title: Babel插件开发小试：让Javascript可以运算符重载
 date: 2024-11-24 20:32:57
 tags: 前端 Babel
 ---
-# Babel插件开发小试：让Javascript可以运算符重载
-
 ## 一、插件的使用与配置
 
 要使用此插件，在`Babel`的配置文件中需加入如下配置
