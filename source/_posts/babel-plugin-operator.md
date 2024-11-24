@@ -176,6 +176,8 @@ true
 
 ## 四、操作抽象语法树
 
+我们在[AST Explorer](astexplorer.net)上可以看到`Babel`解析出的抽象语法树。
+
 想要创建一个`Babel`插件（`Plugin`），首先要在`Babel`配置文件中声明该插件（见第一部分）。该配置指向的文件需要导出一个函数，如下给出了这个函数的基本结构。
 
 ```javascript
@@ -277,7 +279,55 @@ obj["member"]
 arr[1]
 ```
 
+更多抽象语法树节点详见[Babel的github](https://github.com/babel/babel/tree/master/packages/babel-types/src/definitions)。
 
+我们也可以将一个节点换为多个节点。代码如下：
+
+```js
+path.replaceWithMultiple([
+	t.parenthesizedExpression(
+		t.assignmentExpression(
+			"=", path.node.left, t.callExpression(
+				t.memberExpression(t.identifier(this.operatorObjectName), t.identifier(operator)),
+                [path.node.left, path.node.right]
+			)
+		), path.node.left
+	),
+    t.expressionStatement(t.stringLiteral("str1")),
+    t.expressionStatement(t.stringLiteral("str2")),
+]);
+```
+
+这段代码插入了一个赋值语句和两个字符串，赋值语句的左侧是原来的左值，右侧是一个对重载函数的调用。
+
+用以下代码在当前节点的前面和后面插入新的节点。
+
+```js
+path.insertBefore(t.expressionStatement(t.stringLiteral("This will be inserted BEFORE current node")));
+path.insertAfter(t.expressionStatement(t.stringLiteral("This will be inserted AFTER current node")));
+```
+
+在本插件中也用到了查找父节点函数。须知`path`（路径）不等于`node`（抽象语法树节点），`path`同时存储了父节点指针、作用域等信息，最有用的是`scope`（作用域），其他的大多我也不知道是干什么的。
+
+```js
+const operatorObjectParent = path.findParent((parentPath) =>
+	t.isVariableDeclaration(parentPath) &&
+    that.operatorObjectName == parentPath.node.declarations?.[0].id.name
+);
+if(operatorObjectParent) return;
+```
+
+这段代码用于判断当前节点是否是`$operator`中的，如果是，那就退出遍历以免将自己的运算重载造成递归死循环，例如：
+
+```js
+plus(l, r) {
+    return plus(l, r);
+}
+```
+
+### 完整代码见github仓库
+
+[babel-plugin-operator](https://github.com/stone926/babel-plugin-operator)
 
 ## 五、遇到的问题
 
@@ -324,11 +374,19 @@ BinaryExpression(path) {
 
 显然`Program`会最先`visit`。
 
-我们称被编译的原样的代码称作原始代码，`Babel`编译后写入的新代码或改变后的代码称作产物代码。由于上述原因，产物代码也会被重载，这是我们不希望的。而且，如果原始代码中的重载函数也被编译为产物代码，产物代码又被重载，就会导致递归死循环。因此，我们要给原始代码打上标记，标明它是原始的，可以修改。产物代码没有这种标记，我们就不修改。我们通过加特定的注释打标记，因为每个抽象语法树节点`Node`都拥有属性`TrailingComments`，即尾注释。我们可以通过配置修改标记的内容，引入新配置：
+我们称被编译的原样的代码称作原始代码，`Babel`编译后写入的新代码或改变后的代码称作产物代码。由于上述原因，产物代码也会被重载，这是我们不希望的。而且，如果原始代码中的重载函数也被编译为产物代码，产物代码又被重载，就会导致递归死循环。
+
+#### 解决方案一
+
+因此，我们要给原始代码打上标记，标明它是原始的，可以修改。产物代码没有这种标记，我们就不修改。我们通过加特定的注释打标记，因为每个抽象语法树节点`Node`都拥有属性`TrailingComments`，即尾注释。我们可以通过配置修改标记的内容，引入新配置：
 
 ```json
 "plugins": [
-    ["./plugin-operator/main.js", { "operatorObjectName": "$operator" }, { "originalMark": "__original__" }]
+    [
+     "./plugin-operator/main.js",
+     { "operatorObjectName": "$operator" },
+     { "originalMark": "__original__" }
+    ]
 ]
 ```
 
@@ -361,15 +419,84 @@ const isOriginal = (node, originalMark) => {
     let b = false;
     node.trailingComments?.forEach(comment => {
       b = (comment.value === originalMark);
-      if (b) comment.value = "";
+      if (b) comment.value = ""; // 移除注释，减小编译产物体积
     });
     return b;
 };
 ```
 
+#### 优化：解决方案二
+
+但上述方法添加注释会增加代码体积，注释也增加了许多无用的内容，并且会破坏编译产物可读性（虽然可能没什么人会读），例如如下编译结果十分丑陋：
+
+```js
+arr[++i /**/]; 
+$operator.plus(a, b);/**/
+```
+
+为了避免`Babel`的自动合并导致bug，我们就不要让`Babel`来遍历节点，我们自己遍历节点。须知，`path`上存在方法`traverse`让我们可以自己遍历`path`，其参数与插件导出之函数的返回值差别不大，只是没有`pre`、`post`，每个方法也没有`state`形参，因为他不会读取插件配置。`traverse`方法的第二个参数会绑定到一个参数的`this`上。于是我们可以写出如下代码：
+
+```js
+Program(path, state) {
+    const that = this;
+    path.traverse(
+    	UnaryExpression(path){
+            // replace the nodes
+        },
+        // other visitors
+    )
+}
+```
+
+这样就不需要打标记，直接操作节点就可以了。
+
 ## 六、未来展望
 
 ### （一）与Typescript结合，实现精确到对某种类型的重载
+
+`Javascript`是弱类型的，无法进行类型校验，所有在运算符重载时，你在心里必须清楚参与运算的是什么类型，并且要在重载函数中判断参数的类型。如果引入`Typescript`，可以做到在编译阶段就确定哪些运算需要重载，哪些不需要。例如：定义`Typescript`类型`Matrix`，只编译`Matrix`的矩阵乘法，不编译其他乘法。
+
+### （二）兼容Vue Template和jsx
+
+暂未测试改插件能否在各种框架自定义的语法下使用。希望今后实现如下效果：
+
+```vue
+<template>
+{{ person.name }}完成了{{ person.count }}次跳绳
+<button @click="++person">click to jump</button>
+</template>
+<script>
+import { reactive } from "vue";
+const $operator = {
+    incrementPrefix(x) {
+        return { ...x, count: x.count + 1 };
+    }
+};
+const person = reactive({ name: "小明", count: 1 });
+</script>
+```
+
+```jsx
+import { useState } from "react";
+const $operator = {
+    equal(l, r) { return l === r; },
+    plus(l, r) {
+       	if(typeof l != "number" || typeof r != "number") return parseInt(l) + parseInt(r); 
+        return l + r;
+    }
+}
+export default function Test() {
+    const [a, setA] = useState(1);
+    const [b, setB] = useState("1");
+    function handleClick() {
+        setA(a + 1);
+        setB(b + 1);
+    }
+    return <div onClick={handleClick}>
+		{ a == b } {/* Always true */}
+    </div>
+}
+```
 
 
 
