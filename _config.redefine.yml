@@ -218,6 +218,7 @@ navbar:
       icon: fa-regular fa-link
       submenus:
         github: https://github.com/stone926
+        zhihu: https://www.zhihu.com/people/nullpointer-63-46
     #     Link2: /link2
     #     Link3: /link3
     # ...... # you can add more
