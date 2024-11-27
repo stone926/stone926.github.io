@@ -460,7 +460,7 @@ Program(path, state) {
 
 暂未测试改插件能否在各种框架自定义的语法下使用。希望今后实现如下效果：
 
-```vue
+```html
 <template>
 {{ person.name }}完成了{{ person.count }}次跳绳
 <button @click="++person">click to jump</button>
