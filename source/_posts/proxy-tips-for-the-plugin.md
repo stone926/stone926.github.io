@@ -92,7 +92,7 @@ export const build = (_obj) => {
   return new Proxy(
     // args应为原始类型number、string、boolean等或表达式类型的抽象语法树节点Expression
   	(...args) => build(t.callExpression(obj, args.map(item =>
-        // fromLiteral就是把原始类型转为相应literal节点的函数，在此省略
+      // fromLiteral就是把原始类型转为相应literal节点的函数，在此省略
     	t.isExpression(item) ? item : fromLiteral(item) 
   	))), {
     get(target, prop) { // prop的值可取string或symbol。如果不是这两个，会自动toString()
@@ -100,11 +100,8 @@ export const build = (_obj) => {
         return obj;
       } else if (isAssignmentOperator(prop)) { // 这个后面再说
         return buildAssignment(obj, prop);
-      }
-        // 如果传入了symbol，说明使用者可能想让Babel生成形如obj[someSymbol]的代码
-        // 此时他应该传入symbol变量的identifier或创建一个对Symbol的callExpression
-        else if (typeof prop === "symbol") { 
-        throw new TypeError("please build Symbol by function call");
+      } else if (typeof prop === "symbol") {  // 如果传入了symbol，当作identifier
+        return build(t.memberExpression(obj, t.identifier(prop.description), true));
       } else {
         // 再套一层build实现链式调用，因为prop形式可能多种多样，如`a..b`、`??`等
         // 在此一概令computed参数为true
@@ -148,17 +145,15 @@ export const buildAssignment = (obj, operator) => {
 }
 ```
 
-因为不明原因，如果使用`let right = t.isExpression(_right) ? _right : fromLiteral(_right)`，就会抛出我上面`throw`的`TypeError: please build Symbol by function call`，我不知道这个`symbol`是从哪来的，只能暂时使用`try-catch`，我也不知道为什么这样就能修复这个问题并且目前没有发现编译出的代码有误。
-
 当我们调用访问`build`后之节点的属性，且该属性是赋值运算符，就会返回相应的`buildAssignment`函数，我们调用这个函数并传入赋值运算符的右值，就可以得到相应的`AssignmentExpression`。我们可以实现如下效果：
 
 ```js
 import generator from "@babel/generator"
 
-const node = build("obj").prop['='](build("p").k()).func()
+const node = build("obj")[symbol("prop")]['='](build("p").k()).func()
 console.log(generator.default(node.raw).code)
 // console output:
-// (obj["prop"]=p["k"]())["func"]()
+// (obj[prop]=p["k"]())["func"]()
 ```
 
 虽然等号两边不对称，但大体还是所见即所得。
