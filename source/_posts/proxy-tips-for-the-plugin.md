@@ -121,10 +121,10 @@ export const build = (_obj) => {
 ```js
 import generator from "@babel/generator"
 
-const node = build("obj")[t.identifier("prop")][0].foo.bar(t.identifier("id"), "id", 1, null).baz
+const node = build("obj")["prop"][0].foo.bar(t.identifier("id"), "id", 1, null).baz
 console.log(generator.default(node.raw).code)
 // console output:
-// obj[prop]["0"]["foo"]["bar"](id, "id", 1, null).baz
+// obj["prop"]["0"]["foo"]["bar"](id, "id", 1, null).baz
 ```
 
 在构建抽象语法树时，所见即所得。
